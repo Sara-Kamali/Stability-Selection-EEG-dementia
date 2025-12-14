@@ -1,3 +1,11 @@
+#!/usr/bin/env python
+# coding: utf-8
+
+# # Stability selection over complexity based and TAR extracted from EEG dataset for dementia
+
+# In[33]:
+
+
 # === Cell 1: Imports for Stability Selection (LOSO, nested, classification) ===
 import os, warnings, math
 from collections import defaultdict, Counter
@@ -48,6 +56,11 @@ warnings.filterwarnings("ignore")
 SEED = 42
 rng = check_random_state(SEED)
 
+print("Imports OK — ready for Stability Selection within LOSO.")
+
+
+# In[35]:
+
 
 # --- Cell 2a: Load XX (N × n_trl × n_feat) and labels from MATLAB exports ---
 
@@ -56,11 +69,11 @@ import numpy as np
 import pandas as pd
 from scipy.io import loadmat
 
-# mat_root = "/Users/sarakamali/Desktop/dementia/Dementia analysis/"
-# out_dir  = "./stability_results/LPFC_all"
+mat_root = "/Users/sarakamali/Desktop/dementia/Dementia analysis/"
+out_dir  = "./stability_results/LPFC_all"
 
-mat_root = "/home/saraka/simulations/dementia"
-out_dir  = "./LPFC_all"
+# mat_root = "/home/saraka/simulations/dementia"
+# out_dir  = "./LPFC_all"
 
 os.makedirs(out_dir, exist_ok=True)
 
@@ -149,7 +162,7 @@ print(f"[{CLUSTER}] y_EL counts:", pd.Series(y_EL).value_counts(dropna=False).to
 feature_names = D.get("feature_names", [f"feat_{i+1}" for i in range(X_all.shape[2])])
 
 
-# In[75]:
+# In[36]:
 
 
 # === Cell 2b: Cohort summary (from MAT fields in dd) — subject_id, age, gender ===
@@ -256,7 +269,7 @@ plt.close(fig3)
 print("Saved figures and CSVs to:", out_dir)
 
 
-# In[76]:
+# In[37]:
 
 
 # === Cell 2c: Create & append ratio features by name ===
@@ -320,7 +333,7 @@ if skipped:
 KEPT_FEATURE_IDX = np.where(np.isin(feature_names_orig, feature_names))[0].tolist() if 'feature_names_orig' in globals() else None
 
 
-# In[77]:
+# In[38]:
 
 
 # === Cell 2d: Drop or reset features by name ===
@@ -407,7 +420,7 @@ DROPPED_FEATURE_IDX = np.where(~np.isin(feature_names_orig, feature_names))[0].t
 DROPPED_FEATURE_NAMES = [feature_names_orig[i] for i in DROPPED_FEATURE_IDX]
 
 
-# In[79]:
+# In[39]:
 
 
 # === Cell 3: Prepare subject-level matrix for LOSO + Stability Selection ===
@@ -505,7 +518,7 @@ print("Unique subjects:", len(np.unique(subject_id)))
 print("Example aggregated feature names:", agg_names[:8].tolist())
 
 
-# In[50]:
+# In[40]:
 
 
 # === Cell 4: Stability Selection helper (Elastic-Net / L1 logistic, saga) ===
@@ -604,23 +617,17 @@ def stability_selection_logreg( X, y, C_grid, n_subsamples=500, subsample_frac=0
 
     if return_refit and selected_idx.size > 0:
         Xs = StandardScaler().fit_transform(X[:, selected_idx])
-        refit = LogisticRegression(
-            penalty=None,        # <-- no regularization
-            solver='lbfgs',
-            class_weight=class_weight,
-            max_iter=2000
-        )
+        refit = LogisticRegression( penalty='none', solver='lbfgs',  class_weight=class_weight, max_iter=2000)
         refit.fit(Xs, y)
         out['refit_coef'] = refit.coef_.ravel()
         out['refit_intercept'] = float(refit.intercept_)
-
 
     return out 
 
 print("Stability selection helper ready (plateau-aware C picking + refit option).")
 
 
-# In[51]:
+# In[41]:
 
 
 def youden_threshold_oof(y_true, y_score):
@@ -634,7 +641,7 @@ def youden_threshold_oof(y_true, y_score):
 
 # # LOSO with Stability slection 
 
-# In[52]:
+# In[42]:
 
 
 # === Cell 5: helpers ===
@@ -658,13 +665,13 @@ def _oof_probs_with_C(X_tr_sel, y_tr, C, seed, inner_folds, scaler_key="standard
 
     if penalty in ('l1','elasticnet'):
         solver, l1r = 'saga', (None if penalty=='l1' else float(l1_ratio))
-    elif penalty in ('l2',None,'none'):
+    elif penalty in ('l2','none'):
         solver, l1r = 'lbfgs', None
     else:
         raise ValueError("penalty must be one of: 'l1','elasticnet','l2','none'.")
 
     base = Pipeline(steps=[ ("imp", SimpleImputer(strategy="median")),  ("sc", scaler),
-        ("clf", LogisticRegression( penalty=penalty_arg, solver=solver, C=C, l1_ratio=l1r, class_weight="balanced",
+        ("clf", LogisticRegression( penalty=penalty, solver=solver, C=C, l1_ratio=l1r, class_weight="balanced",
             max_iter=5000, tol=1e-4,  warm_start=False, random_state=seed)) ])
     for tr_i, va_i in skf.split(X_tr_sel, y_tr):
         pipe = clone(base)
@@ -681,13 +688,13 @@ def _inner_baccs_for_C(X_tr_sel, y_tr, C, seed, inner_folds, scaler_key="standar
 
     if penalty in ('l1', 'elasticnet'):
         solver, l1r = 'saga', (None if penalty == 'l1' else float(l1_ratio))
-    elif penalty in ('l2', 'none', None):
+    elif penalty in ('l2', 'none'):
         solver, l1r = 'lbfgs', None
     else:
         raise ValueError("penalty must be one of: 'l1','elasticnet','l2','none'.")
 
     base_pipe = Pipeline(steps=[ ("imp", SimpleImputer(strategy="median")), ("sc", scaler),
-        ("clf", LogisticRegression(penalty=penalty_arg, solver=solver, C=C, l1_ratio=l1r, class_weight=class_weight, 
+        ("clf", LogisticRegression(penalty=penalty, solver=solver, C=C, l1_ratio=l1r, class_weight=class_weight, 
                                    max_iter=5000, tol=1e-4, warm_start=False, random_state=seed)) ])
 
     for tr_i, va_i in skf.split(X_tr_sel, y_tr):
@@ -701,7 +708,7 @@ def _inner_baccs_for_C(X_tr_sel, y_tr, C, seed, inner_folds, scaler_key="standar
     return np.asarray(baccs, float)
 
 
-# In[53]:
+# In[43]:
 
 
 # === Cell 6: LOSO  ===
@@ -723,11 +730,11 @@ def run_loso_once(X_subj, y_labels, subject_id, STAB_SEARCH_GRID, FINAL_PENALTIE
 
     outer_fold = 0
     logo = LeaveOneGroupOut()
-    for train_idx, test_idx in logo.split(X_subj, y, subject_id):
+    for train_idx, test_idx in logo.split(X_subj, y_labels, subject_id):
         outer_fold += 1
         print(f"----------------------  Fold: {outer_fold}/{n} --------------------- ")
         X_tr_raw, X_te_raw = X_subj[train_idx], X_subj[test_idx]
-        y_tr, y_te = y[train_idx], y[test_idx]
+        y_tr, y_te = y_labels[train_idx], y_labels[test_idx]
 
         # --- initialise per-fold bests (use BAcc, not AUC) ---
         best_inner_bacc = -np.inf
@@ -881,26 +888,15 @@ def run_loso_once(X_subj, y_labels, subject_id, STAB_SEARCH_GRID, FINAL_PENALTIE
         bacc_tr_oof = balanced_accuracy_score(y_tr, yhat_tr_oof)
         auc_tr_oof  = roc_auc_score(y_tr, oof_probs) if len(np.unique(y_tr)) == 2 else np.nan
 
-        solver = 'lbfgs' if BEST_PENALTY in ('l2', 'none', None) else 'saga'
+        solver = 'lbfgs' if BEST_PENALTY in ('l2','none') else 'saga'
         l1r_use = (float(BEST_L1_RATIO) if BEST_PENALTY == 'elasticnet' else None)
         C_final = (1.0 if BEST_PENALTY == 'none' else (BEST_C_FINAL if BEST_C_FINAL is not None else 1.0))
-        penalty_arg = None if BEST_PENALTY in ('none', None) else BEST_PENALTY
-        
-        final_pipe = Pipeline(steps=[
-            ("imp", SimpleImputer(strategy="median")),
-            ("sc", SCALERS[BEST_SCALER_KEY]),
-            ("clf", LogisticRegression(
-                penalty=penalty_arg,    # <---
-                solver=solver,
-                C=C_final,
-                l1_ratio=l1r_use,
-                class_weight="balanced",
-                max_iter=5000,
-                tol=1e-4,
-                warm_start=False,
-                random_state=SEED))
-        ])
 
+        final_pipe = Pipeline(steps=[("imp", SimpleImputer(strategy="median")),("sc", SCALERS[BEST_SCALER_KEY]),
+                                      ("clf", LogisticRegression(penalty=BEST_PENALTY, solver=solver, C=C_final,
+                                                                 l1_ratio=l1r_use, class_weight="balanced", 
+                                                                 max_iter=5000, tol=1e-4, warm_start=False, random_state=SEED))
+                                    ])
         final_pipe.fit(X_tr_sel, y_tr)
 
         prob_te = final_pipe.predict_proba(X_te_sel)[:, 1]
@@ -1022,7 +1018,7 @@ def run_loso_once(X_subj, y_labels, subject_id, STAB_SEARCH_GRID, FINAL_PENALTIE
         "per_fold_freq_full": per_fold_freq_full, "per_fold_selected_names": per_fold_selected }
 
 
-# In[82]:
+# In[49]:
 
 
 #========== Cell 7: evaluation for hyperparam tuning =================
@@ -1033,8 +1029,9 @@ from sklearn.metrics import balanced_accuracy_score, accuracy_score
 # === 1. Evaluate one (pfer, pi_thr, l1_ratio) with 5-fold CV       ===
 # =====================================================================
 
-def evaluate_block(X, y, pfer, pi_thr, l1_ratio, C_grid, cv_folds=5):
-    skf = StratifiedKFold(n_splits=cv_folds, shuffle=True, random_state=0)
+def evaluate_block(X, y, pfer, pi_thr, l1_ratio, C_grid, cv_folds=5, base_seed=0):
+    
+    skf = StratifiedKFold(n_splits=cv_folds, shuffle=True, random_state=base_seed)
 
     fold_baccs = []
     fold_accs = []
@@ -1052,8 +1049,8 @@ def evaluate_block(X, y, pfer, pi_thr, l1_ratio, C_grid, cv_folds=5):
         # --------------------------
         # Stability selection inside this fold
         # --------------------------
-        stab_res = stability_selection_logreg(X_tr, y_tr,C_grid=C_grid,n_subsamples=1000,subsample_frac=0.5,
-            l1_ratio=l1_ratio, pi_thr=pi_thr, class_weight="balanced",PFER_base=pfer)
+        stab_res = stability_selection_logreg(X_tr, y_tr,C_grid=C_grid,n_subsamples=200,subsample_frac=0.5,
+            l1_ratio=l1_ratio, pi_thr=pi_thr, class_weight="balanced", rng=base_seed + fold_n, PFER_base=pfer)
 
         for c in stab_res.get("C_per_run", []):
             if c not in C_used:
@@ -1082,7 +1079,7 @@ def evaluate_block(X, y, pfer, pi_thr, l1_ratio, C_grid, cv_folds=5):
         for scaler_name, scaler_obj in SCALERS.items():
 
             pipe = Pipeline([ ("imp", SimpleImputer(strategy="median")),("sc", scaler_obj),
-                ("clf", LogisticRegression( penalty=None, solver="lbfgs", C=1e5, class_weight="balanced", max_iter=5000 ))
+                ("clf", LogisticRegression( penalty="none", solver="lbfgs", C=1e5, class_weight="balanced", max_iter=5000 ))
             ])
 
             pipe.fit(X_tr_s, y_tr)
@@ -1109,7 +1106,7 @@ def evaluate_block(X, y, pfer, pi_thr, l1_ratio, C_grid, cv_folds=5):
     return avg_bacc, avg_acc, fold_scalers, C_used, fold_metrics
 
 
-# In[83]:
+# In[50]:
 
 
 #============= Cell 8: Tuning call ==================
@@ -1120,11 +1117,11 @@ print("==============================\n")
 all_results_log = []
 
 # Search grids
-PFER_GRID     = [1, 2, 3, 4, 5, 6, 7]
+PFER_GRID     = [1, 2, 3, 4, 5, 6]
 PI_THR_GRID   = [0.6, 0.65, 0.7, 0.75, 0.8, 0.85,0.9,0.95]
-L1_RATIO_GRID = [0.2,0.25,0.3,0.35,0.4,0.45,0.5,0.55,0.6,0.65,0.7,0.75,0.8,0.85,0.9,0.95]
+L1_RATIO_GRID = [0.3,0.35,0.4,0.45,0.5,0.55,0.6,0.65,0.7,0.75,0.8,0.85,0.9,0.95]
 
-C_stab_grid = np.logspace(-5, 3, 50) # a wide range for scanning
+C_stab_grid = np.logspace(-5, 3, 30) # a wide range for scanning
 
 n_pfer = len(PFER_GRID)
 n_pi   = len(PI_THR_GRID)
@@ -1152,6 +1149,17 @@ for ip, pfer in enumerate(PFER_GRID):
 
             avg_bacc, avg_acc, scalers, Cvals, fold_metrics = evaluate_block(X_subj, y_labels, 
                 pfer=pfer, pi_thr=pi, l1_ratio=l1,C_grid=C_stab_grid, cv_folds= 5,)
+            key3 = (float(pfer), float(pi), float(l1))
+
+            # store per (pfer, pi, l1)
+            C_values_dict[key3]     = list(Cvals) if Cvals is not None else []
+            scaler_votes_dict[key3] = list(scalers) if scalers is not None else []
+            
+            # optional: store per (pfer, pi) slice log
+            pair = (float(pfer), float(pi))
+            accuracies_by_pair.setdefault(pair, []).append(
+                {"l1": float(l1), "acc": float(avg_acc), "bacc": float(avg_bacc)}
+            )
 
             print(f"avg_bacc={avg_bacc}")
 
@@ -1161,169 +1169,161 @@ for ip, pfer in enumerate(PFER_GRID):
 
 if out_dir is not None:
     os.makedirs(out_dir, exist_ok=True)
-    np.savez(os.path.join(out_dir, "stability_grid_LPFC_all.npz"),
+    np.savez(os.path.join(out_dir, "stability_grid_LPFC_classic.npz"),
         bacc_grid=bacc_grid,
         acc_grid=acc_grid,
         PFER_GRID=np.array(PFER_GRID),
         PI_THR_GRID=np.array(PI_THR_GRID),
-        L1_RATIO_GRID=np.array(L1_RATIO_GRID),)
+        L1_RATIO_GRID=np.array(L1_RATIO_GRID),
+        C_values_dict=C_values_dict    
+            )
+
+
+# In[56]:
+
+
+
+
+
+# In[98]:
+
 
 # ----------------------------------------------------------------------
-# 2) Plateau-based selection:
-#    - restrict to points within 95% of global max BAcc
-#    - among them, choose the one with highest mean BAcc in its 3×3×3 neighborhood
-#    - tie-break: higher center BAcc, then more valid neighbors
-#    Then, for the chosen (pfer*, pi*), select up to 3 l1 values
-#    with BAcc >= 95% of the best BAcc at that (pfer*, pi*).
+# 2) Best (pfer,pi) pair selection:
 # ----------------------------------------------------------------------
 
 if np.all(np.isnan(bacc_grid)):
     raise RuntimeError("All balanced accuracies are NaN – cannot select hyperparameters.")
 
-rel_thresh = 0.95
-bacc_max = float(np.nanmax(bacc_grid))
+# 1) max over l1 for each (pfer,pi)
+pair_max = np.nanmax(bacc_grid, axis=2)     # shape: (n_pfer, n_pi)
+global_max = float(np.nanmax(pair_max))
 
-# 2.1: candidate set (near-global maxima)
-candidate_mask = (bacc_grid >= rel_thresh * bacc_max) & ~np.isnan(bacc_grid)
-if not np.any(candidate_mask):
-    # fallback: use all non-NaN points if threshold is too strict
-    candidate_mask = ~np.isnan(bacc_grid)
+# float-safe equality (tolerance can be tightened/loosened)
+rtol, atol = 1e-12, 1e-12
 
-best_score = -np.inf      # neighborhood mean
-best_center = -np.inf     # center BAcc
-best_n_valid = -1         # number of valid neighbors
-best_idx = None
+# 2) candidate (pfer,pi) pairs that reach the global maximum
+cand_pairs = np.argwhere(np.isclose(pair_max, global_max, rtol=rtol, atol=atol))
 
-for ip in range(n_pfer):
-    for ii in range(n_pi):
-        for il in range(n_l1):
-            if not candidate_mask[ip, ii, il]:
-                continue
+# 3) for each candidate, count how many l1 values achieve the same global maximum
+best = None  # tuple: (-count, pfer_value, pi_value, ip, ii)
 
-            center = bacc_grid[ip, ii, il]
+for ip, ii in cand_pairs:
+    vec = bacc_grid[ip, ii, :]
+    count_max = int(np.sum(np.isclose(vec, global_max, rtol=rtol, atol=atol) & ~np.isnan(vec)))
 
-            # 3×3×3 neighborhood (clipped at borders)
-            p_lo  = max(0, ip - 1)
-            p_hi  = min(n_pfer - 1, ip + 1)
-            pi_lo = max(0, ii - 1)
-            pi_hi = min(n_pi   - 1, ii + 1)
-            l_lo  = max(0, il - 1)
-            l_hi  = min(n_l1  - 1, il + 1)
+    pfer_val = PFER_GRID[ip]
+    pi_val   = PI_THR_GRID[ii]
 
-            local = bacc_grid[p_lo:p_hi+1, pi_lo:pi_hi+1, l_lo:l_hi+1]
-            valid = local[~np.isnan(local)]
-            if valid.size == 0:
-                continue
+    key = (-count_max, pfer_val, -pi_val, ip, ii)  # max count, then smallest pfer, then largest pi
+    if (best is None) or (key < best):
+        best = key
 
-            local_mean = float(np.mean(valid))
-            n_valid = int(valid.size)
-
-            # tie-breaking: plateau mean, then center BAcc, then number of neighbors
-            if (local_mean > best_score or
-                (np.isclose(local_mean, best_score) and center > best_center) or
-                (np.isclose(local_mean, best_score) and np.isclose(center, best_center) and n_valid > best_n_valid)):
-                best_score = local_mean
-                best_center = center
-                best_n_valid = n_valid
-                best_idx = (ip, ii, il)
-
-# Fallback: if for some reason we didn't find a plateau candidate, use global max
-if best_idx is None:
-    flat_idx = np.nanargmax(bacc_grid)
-    best_idx = np.unravel_index(flat_idx, bacc_grid.shape)
-    best_score = float("nan")
-    best_n_valid = 0
-
-ip_star, ii_star, il_star = best_idx
-
+_, _, _, ip_star, ii_star = best
 pfer_star = PFER_GRID[ip_star]
 pi_star   = PI_THR_GRID[ii_star]
 
 # ----------------------------------------------------------------------
 # 3) L1 selection at the chosen (pfer*, pi*):
-#    keep up to 3 l1 ratios with BAcc >= 95% of the best BAcc on that slice
+#    keep up to 3 l1 ratios with BAcc >= 98% of the best BAcc on that slice
 # ----------------------------------------------------------------------
 bacc_l1 = bacc_grid[ip_star, ii_star, :]
 acc_l1  = acc_grid[ip_star, ii_star, :]
 
+
+bacc_l1 = bacc_grid[ip_star, ii_star, :]
+acc_l1  = acc_grid[ip_star, ii_star, :]
+
 if np.all(np.isnan(bacc_l1)):
-    # pathological case: slice is NaN; fall back to il_star from plateau
-    l1_star_idx = il_star
-    top_l1_idx = [il_star]
-    best_l1_bacc = float(bacc_grid[ip_star, ii_star, il_star])
+    raise RuntimeError("Chosen (pfer*,pi*) slice is all NaN. This should not happen if pair selection worked.")
 else:
-    best_l1_idx = int(np.nanargmax(bacc_l1))
-    best_l1_bacc = float(bacc_l1[best_l1_idx])
-    l1_bacc_thresh = 0.95 * best_l1_bacc
-
-    candidates_l = [
-        (il, float(bacc_l1[il]))
-        for il in range(n_l1)
-        if (not np.isnan(bacc_l1[il])) and (bacc_l1[il] >= l1_bacc_thresh)
-    ]
-    candidates_l_sorted = sorted(candidates_l, key=lambda x: x[1], reverse=True)
-
-    if not candidates_l_sorted:
-        # at least keep the best l1 for this slice
-        top_l1_idx = [best_l1_idx]
+    best_l1_bacc = float(np.nanmax(bacc_l1))
+    l1_bacc_thresh = 0.98 * best_l1_bacc
+    
+    rtol, atol = 1e-12, 1e-12
+    
+    # indices of exact maxima (float-safe)
+    max_mask = np.isclose(bacc_l1, best_l1_bacc, rtol=rtol, atol=atol) & ~np.isnan(bacc_l1)
+    max_idx  = np.where(max_mask)[0].tolist()
+    
+    if len(max_idx) >= 3:
+        # keep ONLY 3 maxima with the largest l1 ratios
+        top_l1_idx = sorted(max_idx, key=lambda il: (-float(L1_RATIO_GRID[il]), il))[:3]
     else:
-        # keep up to 3 best l1 values
-        top_l1_idx = [il for (il, _) in candidates_l_sorted[:3]]
-
-    l1_star_idx = top_l1_idx[0]  # representative l1 for "main" triple
+        # keep all maxima (0,1,2 of them), then fill with top-98% non-maxima until total <= 3
+        top_l1_idx = sorted(max_idx, key=lambda il: (-float(L1_RATIO_GRID[il]), il))
+    
+        others = [
+            il for il in range(n_l1)
+            if (not max_mask[il]) and (not np.isnan(bacc_l1[il])) and (bacc_l1[il] >= l1_bacc_thresh)
+        ]
+    
+        # fill by highest BAcc first; tie-break by larger l1_ratio; then index (deterministic)
+        others_sorted = sorted(others, key=lambda il: (-float(bacc_l1[il]), -float(L1_RATIO_GRID[il]), il))
+    
+        need = 3 - len(top_l1_idx)
+        top_l1_idx += others_sorted[:max(0, need)]
+    
+    # representative l1 for the "main" triple (deterministic)
+    l1_star_idx = top_l1_idx[0]
     best_l1_bacc = float(bacc_l1[l1_star_idx])
 
-l1_star = L1_RATIO_GRID[l1_star_idx]
+
+
+l1_star   = float(L1_RATIO_GRID[l1_star_idx])
 best_bacc = float(bacc_grid[ip_star, ii_star, l1_star_idx])
 best_acc  = float(acc_l1[l1_star_idx])
 
-key3_star = (pfer_star, pi_star, l1_star)
+key3_star = (float(pfer_star), float(pi_star), float(l1_star))
 
-# dominant scaler from the winning combination
 votes = [s for s in scaler_votes_dict.get(key3_star, []) if s != "none"]
 dom_scaler = Counter(votes).most_common(1)[0][0] if votes else "robust"
 
-top_l1_ratios_95 = [float(L1_RATIO_GRID[il]) for il in top_l1_idx]
+top_l1_ratios_98 = [float(L1_RATIO_GRID[il]) for il in top_l1_idx]
 
 best_params = {
     "pfer": float(pfer_star),
     "pi_thr": float(pi_star),
     "best_l1_ratio": float(l1_star),
-    "top_l1_ratios_95pct": top_l1_ratios_95,
+    "top_l1_ratios": top_l1_ratios_98,
     "best_bacc": best_bacc,
     "best_acc": best_acc,
     "dominant_scaler": dom_scaler,
     "C_values": C_values_dict.get(key3_star, []),
-    "plateau_score": float(best_score),
-    "plateau_n_valid": int(best_n_valid),
-    "global_max_bacc": bacc_max,
-    "rel_thresh": rel_thresh,
-    "l1_slice_best_bacc": best_l1_bacc,
-    "l1_slice_thresh_95pct": l1_bacc_thresh if not np.all(np.isnan(bacc_l1)) else None,
+    "global_max_bacc": float(global_max),
+    "l1_slice_best_bacc": float(best_l1_bacc),
+    "l1_slice_thresh_98pct": float(l1_bacc_thresh),
 }
 
 print("\n==============================")
-print(" BEST PARAMETERS (PLATEAU-BASED)")
+print(" BEST PARAMETERS (MAX-BASED)")
 print("==============================")
-print(
-    f"(PFER={pfer_star}, pi={pi_star}, L1={l1_star})  "
-    f"-> BAcc={best_bacc:.4f}, Acc={best_acc:.4f}, "
-    f"PlateauScore={best_score:.4f}, "
-    f"Neighbors={best_n_valid}, "
-    f"GlobalMaxBAcc={bacc_max:.4f}"
-)
-print(f"L1s within 95% of best BAcc at (PFER*, pi*): {top_l1_ratios_95}")
+print(f"(PFER={pfer_star}, pi={pi_star}, L1={l1_star}) -> BAcc={best_bacc:.4f}, Acc={best_acc:.4f}, GlobalMaxBAcc={global_max:.4f}")
+print(f"L1 selection at (PFER*, pi*): {top_l1_ratios_98}")
 print(best_params)
+
 
 if out_dir is not None:
     os.makedirs(out_dir, exist_ok=True)
-    np.savez(os.path.join(out_dir, "best_params_LPFC_all.npz"),
+    np.savez(os.path.join(out_dir, "best_params_LVA_classic.npz"),
         best_params=best_params,)
+
+
+# In[99]:
+
+
+C_vals=best_params['C_values']
+all_c = np.concatenate([np.ravel(v) for v in C_vals])
+min_c = np.min(all_c)
+max_c = np.max(all_c)
+clo= int(np.floor(np.log10(min_c)))
+ch= int(np.ceil(np.log10(max_c)))
+clo,ch,min_c,max_c
 
 
 # # Ploting the grid space
 
-# In[84]:
+# In[81]:
 
 
 #========== Cell 9: Plot hyperparam grid space
@@ -1452,7 +1452,7 @@ fig.savefig(os.path.join(out_dir, "2D_best_BAcc_surfaces.png"), dpi=200)
 plt.show()
 
 
-# In[85]:
+# In[82]:
 
 
 #============= Cell 10: Plot 3D of the hyperparam grid
@@ -1499,7 +1499,13 @@ plt.show()
 
 # # ***Running LOSO*** 
 
-# In[88]:
+# In[90]:
+
+
+clo,ch
+
+
+# In[ ]:
 
 
 #========== Cell 11: The LOSO call =================
@@ -1507,46 +1513,15 @@ from copy import deepcopy
 
 SCALERS = {'standard': StandardScaler(),'robust': RobustScaler()}
 
-best_params = {
-    "pfer": float(pfer_star),
-    "pi_thr": float(pi_star),
-    "best_l1_ratio": float(l1_star),
-    "top_l1_ratios_95pct": top_l1_ratios_95,
-    "best_bacc": best_bacc,
-    "best_acc": best_acc,
-    "dominant_scaler": dom_scaler,
-    "C_values": C_values_dict.get(key3_star, []),
-    "plateau_score": float(best_score),
-    "plateau_n_valid": int(best_n_valid),
-    "global_max_bacc": bacc_max,
-    "rel_thresh": rel_thresh,
-    "l1_slice_best_bacc": best_l1_bacc,
-    "l1_slice_thresh_95pct": l1_bacc_thresh if not np.all(np.isnan(bacc_l1)) else None,
-}
 
 # ---- Read best stability parameters from the search ----
 pfer_best = best_params["pfer"]
 pi_best   = best_params["pi_thr"]
-l1_best = best_params["top_l1_ratios_95pct"]
-
-c_range = best_params.get("C_values", [])
-
-if len(c_range) > 0:
-    cmin = float(np.min(c_range))
-    cmax = float(np.max(c_range))
-    log_cmin = np.log10(cmin)
-    log_cmax = np.log10(cmax)
-
-    # 1) Stability C grid, focused on the range where stability-selection actually operated
-    C_STAB = np.logspace(log_cmin-0.5, log_cmax+0.5, 50)
-    print(f"[REFINED C GRIDS] STAB: 10^[{log_cmin-1:.2f},{log_cmax+1:.2f}] ")
-else:
-    # Fallback: your previous manual ranges
-    C_STAB  = np.logspace(-4, 3, 50)
-    print("[REFINED C GRIDS] No c_grid_range_for_refinement found; using default ranges.")
+l1_best = best_params["top_l1_ratios"]
 
 
-C_FINAL = np.logspace(-5, 3, 200) #This is where we can give the final boost to  the model performance with l2
+C_STAB=np.logspace(clo,ch,50)
+C_FINAL = np.logspace(-4, 2, 200) #This is where we can give the final boost to  the model performance with l2
 
 FINAL_PENALTIES = ('none', 'l2',)
 
@@ -1600,7 +1575,7 @@ if len(glob_feats) > 0:
 
 # # **Visualization and reporting of the results**
 
-# In[89]:
+# In[ ]:
 
 
 # ============ Cell 12: Create table of top stable features =================
@@ -1667,7 +1642,7 @@ caption_txt = (
     f"<b>Top {n_top} Stable Features — {CLUSTER}</b><br>"
     f"(PFER={best_params['pfer']:.0f}, "
     f"π<sub>thr</sub>={best_params['pi_thr']:.2f}, "
-    f"L1 ∈ {best_params['top_l1_ratios_95pct']})"
+    f"L1 ∈ {best_params['top_l1_ratios']})"
 )
 
 styled = (
@@ -1692,7 +1667,7 @@ with open(tex_path, "w", encoding="utf-8") as f:
 print(f"LaTeX table saved to: {tex_path}")
 
 
-# In[90]:
+# In[ ]:
 
 
 # ======= Cell 16: Publication plots & tables (enhanced reporting, polished) ========
@@ -2111,7 +2086,7 @@ overall_df.to_csv(os.path.join(OUT_DIR, f"overall_summary_{CLUSTER_LABEL}_{TARGE
                   index=False)
 
 
-# In[98]:
+# In[ ]:
 
 
 #============== Cell 17: Features plot ===============
@@ -2233,6 +2208,12 @@ if _CAN_DISPLAY:
     plt.show()
 else:
     plt.close(fig)
+
+
+# In[ ]:
+
+
+
 
 
 # In[ ]:
