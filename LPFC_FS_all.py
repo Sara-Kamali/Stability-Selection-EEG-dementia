@@ -1,10 +1,5 @@
-#!/usr/bin/env python
-# coding: utf-8
 
 # # Stability selection over complexity based and TAR extracted from EEG dataset for dementia
-
-# In[33]:
-
 
 # === Cell 1: Imports for Stability Selection (LOSO, nested, classification) ===
 import os, warnings, math
@@ -58,10 +53,6 @@ rng = check_random_state(SEED)
 
 print("Imports OK — ready for Stability Selection within LOSO.")
 
-
-# In[35]:
-
-
 # --- Cell 2a: Load XX (N × n_trl × n_feat) and labels from MATLAB exports ---
 
 import os, glob, re
@@ -69,11 +60,9 @@ import numpy as np
 import pandas as pd
 from scipy.io import loadmat
 
-mat_root = "/Users/sarakamali/Desktop/dementia/Dementia analysis/"
-out_dir  = "./stability_results/LPFC_all"
+mat_root = "/root to features file/"
+out_dir  = "./destination path"
 
-# mat_root = "/home/saraka/simulations/dementia"
-# out_dir  = "./LPFC_all"
 
 os.makedirs(out_dir, exist_ok=True)
 
@@ -162,8 +151,6 @@ print(f"[{CLUSTER}] y_EL counts:", pd.Series(y_EL).value_counts(dropna=False).to
 feature_names = D.get("feature_names", [f"feat_{i+1}" for i in range(X_all.shape[2])])
 
 
-# In[36]:
-
 
 # === Cell 2b: Cohort summary (from MAT fields in dd) — subject_id, age, gender ===
 
@@ -187,7 +174,7 @@ if group.size != N or age.size != N or gender.size != N:
 sid = np.asarray(subject_ids).reshape(-1).astype(object)
 meta = pd.DataFrame({"subject_id": sid, "group": group, "age": age, "gender": gender})
 
-# Drop rows with unknown group labels (if any)
+# Drop rows with unknown group labels 
 meta_clean = meta.dropna(subset=["group"]).copy()
 
 # --- Group percentages ---
@@ -269,9 +256,6 @@ plt.close(fig3)
 print("Saved figures and CSVs to:", out_dir)
 
 
-# In[37]:
-
-
 # === Cell 2c: Create & append ratio features by name ===
 
 RATIOS_TO_ADD = [
@@ -333,15 +317,10 @@ if skipped:
 KEPT_FEATURE_IDX = np.where(np.isin(feature_names_orig, feature_names))[0].tolist() if 'feature_names_orig' in globals() else None
 
 
-# In[38]:
-
-
 # === Cell 2d: Drop or reset features by name ===
 # Example usage:
 #   DROP_FEATURES = ["HD(A)/S(A)", "SampEn(HG)/SampEn(LG)"]
 #   RESET_FEATURES = True   # to undo and go back to original
-
-# 81-82
 
 DROP_FEATURES= [
                 # 'M_Theta','M_Alpha','M_Beta','M_Low Gamma','M_High Gamma',
@@ -418,9 +397,6 @@ else:
 KEPT_FEATURE_IDX = np.where(np.isin(feature_names_orig, feature_names))[0].tolist()
 DROPPED_FEATURE_IDX = np.where(~np.isin(feature_names_orig, feature_names))[0].tolist()
 DROPPED_FEATURE_NAMES = [feature_names_orig[i] for i in DROPPED_FEATURE_IDX]
-
-
-# In[39]:
 
 
 # === Cell 3: Prepare subject-level matrix for LOSO + Stability Selection ===
@@ -516,9 +492,6 @@ print(f"X_subj shape: {X_subj.shape}  (subjects × aggregated features)")
 print("Class balance:", pd.Series(y_labels).value_counts().to_dict())
 print("Unique subjects:", len(np.unique(subject_id)))
 print("Example aggregated feature names:", agg_names[:8].tolist())
-
-
-# In[40]:
 
 
 # === Cell 4: Stability Selection helper (Elastic-Net / L1 logistic, saga) ===
@@ -639,10 +612,6 @@ def youden_threshold_oof(y_true, y_score):
     return float(thr[keep][int(np.argmax(J))])
 
 
-# # LOSO with Stability slection 
-
-# In[42]:
-
 
 # === Cell 5: helpers ===
 
@@ -706,9 +675,6 @@ def _inner_baccs_for_C(X_tr_sel, y_tr, C, seed, inner_folds, scaler_key="standar
         baccs.append(balanced_accuracy_score(y_va, preds))
 
     return np.asarray(baccs, float)
-
-
-# In[43]:
 
 
 # === Cell 6: LOSO  ===
@@ -1018,9 +984,6 @@ def run_loso_once(X_subj, y_labels, subject_id, STAB_SEARCH_GRID, FINAL_PENALTIE
         "per_fold_freq_full": per_fold_freq_full, "per_fold_selected_names": per_fold_selected }
 
 
-# In[49]:
-
-
 #========== Cell 7: evaluation for hyperparam tuning =================
 from sklearn.impute import SimpleImputer
 from sklearn.metrics import balanced_accuracy_score, accuracy_score
@@ -1106,9 +1069,6 @@ def evaluate_block(X, y, pfer, pi_thr, l1_ratio, C_grid, cv_folds=5, base_seed=0
     return avg_bacc, avg_acc, fold_scalers, C_used, fold_metrics
 
 
-# In[50]:
-
-
 #============= Cell 8: Tuning call ==================
 print("\n==============================")
 print(" SINGLE-STAGE GRID SEARCH ")
@@ -1177,15 +1137,6 @@ if out_dir is not None:
         L1_RATIO_GRID=np.array(L1_RATIO_GRID),
         C_values_dict=C_values_dict    
             )
-
-
-# In[56]:
-
-
-
-
-
-# In[98]:
 
 
 # ----------------------------------------------------------------------
@@ -1309,9 +1260,6 @@ if out_dir is not None:
         best_params=best_params,)
 
 
-# In[99]:
-
-
 C_vals=best_params['C_values']
 all_c = np.concatenate([np.ravel(v) for v in C_vals])
 min_c = np.min(all_c)
@@ -1322,8 +1270,6 @@ clo,ch,min_c,max_c
 
 
 # # Ploting the grid space
-
-# In[81]:
 
 
 #========== Cell 9: Plot hyperparam grid space
@@ -1450,9 +1396,6 @@ for (row, col, other), ax in zip(pairs, axes):
 fig.tight_layout()
 fig.savefig(os.path.join(out_dir, "2D_best_BAcc_surfaces.png"), dpi=200)
 plt.show()
-
-
-# In[82]:
 
 
 #============= Cell 10: Plot 3D of the hyperparam grid
@@ -1665,9 +1608,6 @@ with open(tex_path, "w", encoding="utf-8") as f:
     f.write(top_df.to_latex(index=False, escape=False))
 
 print(f"LaTeX table saved to: {tex_path}")
-
-
-# In[ ]:
 
 
 # ======= Cell 16: Publication plots & tables (enhanced reporting, polished) ========
@@ -2210,13 +2150,6 @@ else:
     plt.close(fig)
 
 
-# In[ ]:
-
-
-
-
-
-# In[ ]:
 
 
 
